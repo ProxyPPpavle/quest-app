@@ -1,0 +1,8 @@
+{
+  "name": "PP Quest",
+  "description": "Transform your day with creative side quests. Use AI to verify completions through photos, text, and location.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
