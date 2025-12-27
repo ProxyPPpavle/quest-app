@@ -1,13 +1,15 @@
-import * as GoogleGenerativeAI from "@google/generative-ai";
+import * as GA from "@google/generative-ai";
 import { Quest, Language } from "../types";
 
-// Izvlačimo klase direktno iz namespace-a da build ne bi pukao
-const GoogleGenAI = (GoogleGenerativeAI as any).GoogleGenAI || GoogleGenerativeAI?.SchemaType;
-const SchemaType = (GoogleGenerativeAI as any).SchemaType || GoogleGenerativeAI?.SchemaType;
+// @ts-ignore
+const GoogleGenAI = GA.GoogleGenAI;
+// @ts-ignore
+const SchemaType = GA.SchemaType;
 
-// Ostatak koda ostaje isti...
 const apiKey = import.meta.env.VITE_gemini_api_key;
 const genAI = new GoogleGenAI(apiKey || "");
+
+// ... ostatak koda ostaje isti
 
 // Koristimo SchemaType iz nove biblioteke
 const QUEST_SCHEMA = {
