@@ -1,4 +1,5 @@
-import { GoogleGenAI, SchemaType } from "@google/generative-ai";
+import * as GenerativeAI from "@google/generative-ai";
+const { GoogleGenAI, SchemaType } = GenerativeAI;
 import { Quest, Language } from "../types";
 
 // U Vite-u koristimo import.meta.env umesto process.env
