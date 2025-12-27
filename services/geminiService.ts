@@ -1,13 +1,24 @@
-import * as GA from "@google/generative-ai";
+import * as GenerativeAI from "@google/generative-ai";
 import { Quest, Language } from "../types";
 
-// @ts-ignore
-const GoogleGenAI = GA.GoogleGenAI;
-// @ts-ignore
-const SchemaType = GA.SchemaType;
+// Ova linija rešava "Mg is not a constructor" grešku
+const GoogleGenAI = (GenerativeAI as any).GoogleGenAI || 
+                    (GenerativeAI as any).default?.GoogleGenAI || 
+                    GenerativeAI;
+
+const SchemaType = (GenerativeAI as any).SchemaType || 
+                   (GenerativeAI as any).default?.SchemaType;
 
 const apiKey = import.meta.env.VITE_gemini_api_key;
+
+// Provera da li ključ postoji da aplikacija ne bi pukla
+if (!apiKey) {
+  console.warn("VITE_gemini_api_key is missing!");
+}
+
 const genAI = new GoogleGenAI(apiKey || "");
+
+// ... ostatak koda (generateDailyQuests, itd.) ostaje isti
 
 // ... ostatak koda ostaje isti
 
