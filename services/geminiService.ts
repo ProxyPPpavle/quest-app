@@ -1,59 +1,66 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, SchemaType } from "@google/generative-ai";
 import { Quest, Language } from "../types";
 
-// Initialize the Gemini AI client using the environment variable API_KEY directly as per guidelines.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// U Vite-u koristimo import.meta.env umesto process.env
+const apiKey = import.meta.env.VITE_gemini_api_key;
 
+// Inicijalizacija klijenta na ispravan način
+const genAI = new GoogleGenAI(apiKey || "");
+
+// Koristimo SchemaType iz nove biblioteke
 const QUEST_SCHEMA = {
-  type: Type.ARRAY,
+  type: SchemaType.ARRAY,
   items: {
-    type: Type.OBJECT,
+    type: SchemaType.OBJECT,
     properties: {
-      id: { type: Type.STRING },
-      title: { type: Type.STRING },
-      description: { type: Type.STRING },
-      difficulty: { type: Type.STRING },
-      type: { type: Type.STRING },
-      points: { type: Type.NUMBER },
-      instructions: { type: Type.STRING },
+      id: { type: SchemaType.STRING },
+      title: { type: SchemaType.STRING },
+      description: { type: SchemaType.STRING },
+      difficulty: { type: SchemaType.STRING },
+      type: { type: SchemaType.STRING },
+      points: { type: SchemaType.NUMBER },
+      instructions: { type: SchemaType.STRING },
       quizOptions: { 
-        type: Type.ARRAY, 
-        items: { type: Type.STRING },
+        type: SchemaType.ARRAY, 
+        items: { type: SchemaType.STRING },
       },
-      correctAnswer: { type: Type.STRING },
+      correctAnswer: { type: SchemaType.STRING },
     },
     required: ["id", "title", "description", "difficulty", "type", "points", "instructions"],
   },
 };
 
 export async function generateDailyQuests(lang: Language): Promise<Quest[]> {
-  // Fix: Removed 'es' and 'fr' as they are not defined in the Language type.
   const langNames: Record<Language, string> = { en: 'English', sr: 'Serbian' };
+  
   const prompt = `Generate 4 creative 'Side Quests' for a mobile app. 
   LANGUAGE: ${langNames[lang]}.
   
   TYPES TO MIX: QUIZ, IMAGE, TEXT, LOCATION, ONLINE_IMAGE.
   RULES:
   - DO NOT make all 4 the same. Max 2 of any specific type.
-  - For ONLINE_IMAGE: Instructions must ask user to find a specific image on the internet (e.g. "Find a meme of a cat in a hat", "Find a picture of a 1920s car").
+  - For ONLINE_IMAGE: Instructions must ask user to find a specific image on the internet (e.g. "Find a meme of a cat in a hat").
   - For QUIZ: Provide EXACTLY 3 funny and relevant options.
-  - For LOCATION: Instructions must specify a type of real-world public place (e.g. "Go to a library", "Find a fountain").
+  - For LOCATION: Instructions must specify a type of real-world public place.
   - STYLE: Edgy, modern, funny. No boring trivia.
   
   Return JSON only.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
+    // Koristimo stabilan model gemini-1.5-flash
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: {
         responseMimeType: "application/json",
         responseSchema: QUEST_SCHEMA,
       },
     });
 
-    const rawQuests = JSON.parse(response.text || "[]");
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    const rawQuests = JSON.parse(text || "[]");
     return rawQuests.map((q: any) => ({ 
       ...q, 
       id: q.id || Math.random().toString(36).substr(2, 9),
@@ -71,32 +78,42 @@ export async function verifyQuestWithAI(
   type: 'IMAGE' | 'TEXT' | 'LOCATION' | 'ONLINE_IMAGE',
   lang: Language
 ): Promise<{ success: boolean; feedback: string }> {
-  const model = 'gemini-3-flash-preview';
-  // Fix: Removed 'es' and 'fr' as they are not defined in the Language type.
   const langNames: Record<Language, string> = { en: 'English', sr: 'Serbian' };
   
   const typeRules = {
     TEXT: "This is strictly a TEXT submission. Judge creativity and relevance.",
     IMAGE: "This is strictly an IMAGE submission. Analyze visual data.",
-    ONLINE_IMAGE: "This is strictly an ONLINE IMAGE search task. The user found this image online.",
-    LOCATION: `This is strictly a LOCATION submission via coordinates. Check if these coordinates [${proof}] correspond to: '${quest.instructions}'.`
+    ONLINE_IMAGE: "This is strictly an ONLINE IMAGE search task.",
+    LOCATION: `This is strictly a LOCATION submission via coordinates [${proof}].`
   };
 
   const instructions = `You are a strict, sassy AI Quest Master. 
   QUEST TITLE: "${quest.title}"
   QUEST DESC: "${quest.description}"
   EXPECTED TYPE: ${type}
-  
-  VERIFICATION CONTEXT:
-  ${typeRules[type]}
-  
+  VERIFICATION CONTEXT: ${typeRules[type]}
   USER LANGUAGE: ${langNames[lang]}
-  YOUR FEEDBACK LANGUAGE: You MUST respond in ${langNames[lang]}.
+  YOUR FEEDBACK LANGUAGE: Respond in ${langNames[lang]}.
   
-  IF FAIL: success=false, feedback="[Roast the user for a poor attempt in ${langNames[lang]}]"
-  IF PASS: success=true, feedback="[Brief funny praise in ${langNames[lang]}]"
+  IF FAIL: success=false, feedback="[Roast the user]"
+  IF PASS: success=true, feedback="[Funny praise]"
   
   Return JSON: { "success": boolean, "feedback": "string" }`;
+
+  const model = genAI.getGenerativeModel({
+    model: "gemini-1.5-flash",
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: SchemaType.OBJECT,
+        properties: {
+          success: { type: SchemaType.BOOLEAN },
+          feedback: { type: SchemaType.STRING },
+        },
+        required: ["success", "feedback"]
+      },
+    },
+  });
 
   const parts: any[] = [{ text: instructions }];
 
@@ -112,23 +129,9 @@ export async function verifyQuestWithAI(
   }
 
   try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: { parts },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            success: { type: Type.BOOLEAN },
-            feedback: { type: Type.STRING },
-          },
-          required: ["success", "feedback"]
-        }
-      }
-    });
-
-    return JSON.parse(response.text || '{"success":false, "feedback":"System Error"}');
+    const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
+    const response = await result.response;
+    return JSON.parse(response.text() || '{"success":false, "feedback":"System Error"}');
   } catch (e) {
     console.error("Verification failed:", e);
     return { success: false, feedback: "AI judging failed. Try again!" };
