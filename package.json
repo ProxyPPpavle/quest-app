@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "start": "serve .",
-    "build": "echo 'No build step required for ESM-based app'"
+    "build": "tsc && vite build"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.2",
